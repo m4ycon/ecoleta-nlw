@@ -1,1 +1,10 @@
 node_modules
+/tmp/*
+!/tmp/baterias.*
+!/tmp/eletronicos.svg
+!/tmp/lampadas.svg
+!/tmp/oleo.svg
+!/tmp/organicos.svg
+!/tmp/papeis-papelao.svg
+
+*.sqlite
