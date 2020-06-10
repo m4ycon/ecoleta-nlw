@@ -1,17 +1,15 @@
-import React, { useEffect, useState, ChangeEvent, FormEvent } from "react";
+import React, { useEffect, useState, ChangeEvent, useRef } from "react";
 import { Link, useHistory } from "react-router-dom";
-import { FiArrowLeft, FiCheckCircle, FiXCircle } from "react-icons/fi";
+import { FiArrowLeft, FiCheckCircle } from "react-icons/fi";
 import { Map, TileLayer, Marker } from "react-leaflet";
 import api from "../../services/api";
 import axios from "axios";
 import { LeafletMouseEvent } from "leaflet";
-import yup from "yup";
+import { useForm } from "react-hook-form";
 
 import "./styles.css";
-import Dropzone from "../../components/Dropzone";
-import pointSchema from "../../validation/PointSchema";
-
 import logo from "../../assets/logo.svg";
+import Dropzone from "../../components/Dropzone";
 
 interface Item {
   id: number;
@@ -27,8 +25,15 @@ interface IBGECityResponse {
   nome: string;
 }
 
-interface errsArray {
-  path: string;
+interface Inputs {
+  name: string;
+  email: string;
+  whatsapp: number;
+  latitude: number;
+  longitude: number;
+  uf: string;
+  city: string;
+  items: number[];
 }
 
 const CreatePoint = () => {
@@ -36,10 +41,9 @@ const CreatePoint = () => {
   const [ufs, setUfs] = useState<string[]>([]);
   const [cities, setCities] = useState<string[]>([]);
 
-  const [errs, setErrs] = useState<string>("");
-
   const [hiddenResp, setHiddenResp] = useState<boolean>(true);
-  const [success, setSuccess] = useState<boolean>(false);
+
+  const [oneSubmit, setOneSubmit] = useState<number>(0);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -101,6 +105,8 @@ const CreatePoint = () => {
     });
   }, []);
 
+  useEffect(() => {}, [oneSubmit]);
+
   const handleSelectedUf = (event: ChangeEvent<HTMLSelectElement>) => {
     const uf = event.target.value;
     setSelectedUf(uf);
@@ -135,66 +141,75 @@ const CreatePoint = () => {
     }
   };
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
+  // const handleSubmit = async (event: FormEvent) => {
+  //   event.preventDefault();
 
-    const { name, email, whatsapp } = formData;
-    const uf = selectedUf;
-    const city = selectedCity;
-    const [latitude, longitude] = selectedPosition;
-    const items = selectedItems;
+  //   const { name, email, whatsapp } = formData;
+  //   const uf = selectedUf;
+  //   const city = selectedCity;
+  //   const [latitude, longitude] = selectedPosition;
+  //   const items = selectedItems;
 
-    const data = new FormData();
+  //   const data = new FormData();
 
-    pointSchema
-      .validate(
-        {
-          name,
-          email,
-          whatsapp,
-          latitude,
-          longitude,
-          city,
-          uf,
-          items,
-        },
-        { abortEarly: false }
-      )
-      .then(async (res) => {
-        if (selectedFile) {
-          data.append("name", name);
-          data.append("email", email);
-          data.append("whatsapp", whatsapp);
-          data.append("latitude", String(latitude));
-          data.append("longitude", String(longitude));
-          data.append("uf", uf);
-          data.append("city", city);
-          data.append("items", items.join(","));
-          data.append("image", selectedFile);
+  //   if (selectedFile) {
+  //     data.append("name", name);
+  //     data.append("email", email);
+  //     data.append("whatsapp", whatsapp);
+  //     data.append("latitude", String(latitude));
+  //     data.append("longitude", String(longitude));
+  //     data.append("uf", uf);
+  //     data.append("city", city);
+  //     data.append("items", items.join(","));
+  //     data.append("image", selectedFile);
 
-          await api.post("points", data);
+  //     await api.post("points", data);
 
-          setSuccess(true);
-          setHiddenResp(false);
-          setTimeout(() => history.push("/"), 2000);
-        } else {
-          setErrs("image");
-          setSuccess(false);
-          setHiddenResp(false);
-          setTimeout(() => setHiddenResp(true), 2000);
-        }
-      })
-      .catch((err) => {
-        let erros = err.inner
-          .map((errsArray: errsArray) => errsArray.path)
-          .join(", ");
-        if (!selectedFile) erros = "image, " + erros;
-        setErrs(erros);
-        setSuccess(false);
-        setHiddenResp(false);
-      });
+  //     setSuccess(true);
+  //     setHiddenResp(false);
+  //     setTimeout(() => history.push("/"), 2000);
+  //   } else {
+  //     setSuccess(false);
+  //     setHiddenResp(false);
+  //     setTimeout(() => setHiddenResp(true), 2000);
+  //   }
 
-    return;
+  //   return;
+  // };
+
+  const { register, handleSubmit, errors } = useForm<Inputs>();
+
+  const onSubmit = async (formData: Inputs) => {
+    setOneSubmit(oneSubmit + 1);
+    if (
+      JSON.stringify(selectedPosition) !== JSON.stringify([0, 0]) &&
+      selectedFile &&
+      selectedItems.length > 0
+    ) {
+      const { city, email, items, latitude, longitude, name, uf, whatsapp } = {
+        ...formData,
+        latitude: selectedPosition[0],
+        longitude: selectedPosition[1],
+        items: selectedItems,
+      };
+
+      const data = new FormData();
+
+      data.append("name", name);
+      data.append("email", email);
+      data.append("whatsapp", String(whatsapp));
+      data.append("latitude", String(latitude));
+      data.append("longitude", String(longitude));
+      data.append("uf", uf);
+      data.append("city", city);
+      data.append("items", items.join(","));
+      data.append("image", selectedFile);
+
+      await api.post("points", data);
+
+      setHiddenResp(false);
+      setTimeout(() => history.push("/"), 2000);
+    }
   };
 
   return (
@@ -208,12 +223,15 @@ const CreatePoint = () => {
           </Link>
         </header>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit(onSubmit)}>
           <h1>
             Cadastro do <br /> ponto de coleta
           </h1>
 
           <Dropzone onFileUploaded={setSelectedFile} />
+          {!selectedFile && oneSubmit > 0 && (
+            <span className="invalid">Por favor, selecione uma imagem.</span>
+          )}
 
           <fieldset>
             <legend>
@@ -221,33 +239,51 @@ const CreatePoint = () => {
             </legend>
 
             <div className="field">
-              <label htmlFor="name">Nome da entidade</label>
+              <label htmlFor="name">
+                Nome da entidade
+                {errors.name && (
+                  <span className="invalid"> (Insira um nome válido)</span>
+                )}
+              </label>
               <input
                 type="text"
                 name="name"
                 id="name"
                 onChange={handleInputChange}
+                ref={register({ required: true })}
               />
             </div>
 
             <div className="field-group">
               <div className="field">
-                <label htmlFor="email">E-mail</label>
+                <label htmlFor="email">
+                  E-mail
+                  {errors.email && (
+                    <span className="invalid"> (Insira um email válido)</span>
+                  )}
+                </label>
                 <input
                   type="email"
                   name="email"
                   id="email"
                   onChange={handleInputChange}
+                  ref={register({ required: true })}
                 />
               </div>
 
               <div className="field">
-                <label htmlFor="whatsapp">Whatsapp</label>
+                <label htmlFor="whatsapp">
+                  Whatsapp
+                  {errors.whatsapp && (
+                    <span className="invalid"> (Insira um número válido.)</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   name="whatsapp"
                   id="whatsapp"
                   onChange={handleInputChange}
+                  ref={register({ required: true })}
                 />
               </div>
             </div>
@@ -256,7 +292,15 @@ const CreatePoint = () => {
           <fieldset>
             <legend>
               <h2>Endereço</h2>
-              <span>Selecione o endereço no mapa</span>
+              <span>
+                {JSON.stringify(selectedPosition) === JSON.stringify([0, 0]) &&
+                  oneSubmit > 0 && (
+                    <span className="invalid">
+                      (Marque a posição do ponto de coleta)
+                    </span>
+                  )}
+                Selecione o endereço no mapa
+              </span>
             </legend>
 
             <Map center={initialPosition} zoom={15} onClick={handleMapClick}>
@@ -270,14 +314,20 @@ const CreatePoint = () => {
 
             <div className="field-group">
               <div className="field">
-                <label htmlFor="uf">Estado (UF)</label>
+                <label htmlFor="uf">
+                  Estado (UF)
+                  {errors.uf && (
+                    <span className="invalid"> (Selecione uma UF.)</span>
+                  )}
+                </label>
                 <select
                   name="uf"
                   id="uf"
                   value={selectedUf}
                   onChange={handleSelectedUf}
+                  ref={register({ required: true, maxLength: 2 })}
                 >
-                  <option value="0">Selecione uma UF</option>
+                  <option value="">Selecione uma UF</option>
                   {ufs.map((uf) => (
                     <option key={uf} value={uf}>
                       {uf}
@@ -287,14 +337,20 @@ const CreatePoint = () => {
               </div>
 
               <div className="field">
-                <label htmlFor="city">Cidade</label>
+                <label htmlFor="city">
+                  Cidade
+                  {errors.city && (
+                    <span className="invalid"> (Selecione uma cidade.)</span>
+                  )}
+                </label>
                 <select
                   name="city"
                   id="city"
                   value={selectedCity}
                   onChange={handleSelectedCity}
+                  ref={register({ required: true })}
                 >
-                  <option value="0">Selecione uma cidade</option>
+                  <option value="">Selecione uma cidade</option>
                   {cities.map((city) => (
                     <option key={city} value={city}>
                       {city}
@@ -308,7 +364,13 @@ const CreatePoint = () => {
           <fieldset>
             <legend>
               <h2>Ítens de coleta</h2>
-              <span>Selecione um ou mais itens abaixo</span>
+              <span
+                className={
+                  selectedItems.length === 0 && oneSubmit > 0 ? "invalid" : ""
+                }
+              >
+                Selecione um ou mais itens abaixo
+              </span>
             </legend>
 
             <ul className="items-grid">
@@ -325,6 +387,12 @@ const CreatePoint = () => {
             </ul>
           </fieldset>
 
+          {(!selectedFile ||
+            JSON.stringify(selectedPosition) === JSON.stringify([0, 0]) ||
+            selectedItems.length === 0) &&
+            oneSubmit > 0 && (
+              <span className="invalid">Informações inválidas!</span>
+            )}
           <button type="submit">Cadastrar ponto de coleta</button>
         </form>
       </div>
@@ -333,17 +401,9 @@ const CreatePoint = () => {
         hidden={hiddenResp}
         onClick={() => setHiddenResp(true)}
       >
-        <div hidden={!success}>
+        <div>
           <FiCheckCircle color="#34CB79" size={175} />
           <span>Cadastro realizado com sucesso!</span>
-        </div>
-        <div hidden={success}>
-          <FiXCircle color="rgb(209, 71, 71)" size={175} />
-          <span>
-            Informações inválidas!
-            <br />
-            {errs}
-          </span>
         </div>
       </div>
     </>
